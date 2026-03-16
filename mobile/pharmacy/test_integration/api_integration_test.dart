@@ -1,3 +1,4 @@
+@Tags(['integration'])
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -15,8 +16,10 @@ Future<bool> _isServerRunning() async {
   }
 }
 
-/// Integration tests to verify API communication with Pharmacy app
-/// These tests require the API server to be running on http://127.0.0.1:8000
+/// Integration tests to verify API communication with Pharmacy app.
+///
+/// These tests require the API server to be running on http://127.0.0.1:8000.
+/// Run with: flutter test --tags integration
 void main() {
   late Dio dio;
   const baseUrl = 'http://127.0.0.1:8000/api';
