@@ -393,7 +393,7 @@ class FeaturedPharmacyCard extends StatelessWidget {
             ],
           ),
         ),
-        if (pharmacy.isOnDuty) ...[
+        if (pharmacy.isOnDuty == true) ...[
           const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),

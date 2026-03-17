@@ -255,7 +255,7 @@ class _PharmacyDetailsPageState extends ConsumerState<PharmacyDetailsPage> {
                     ),
                     
                     // On Duty Badge
-                    if (pharmacy.isOnDuty)
+                    if (pharmacy.isOnDuty == true)
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,

@@ -346,7 +346,7 @@ class _PharmaciesListPageV2State extends ConsumerState<PharmaciesListPageV2>
   Widget _buildStatsHeader(PharmaciesState state) {
     final pharmacies = _getFilteredPharmacies(state);
     final openCount = pharmacies.where((p) => p.isOpen).length;
-    final onDutyCount = pharmacies.where((p) => p.isOnDuty).length;
+    final onDutyCount = pharmacies.where((p) => p.isOnDuty == true).length;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -642,7 +642,7 @@ class _PharmaciesListPageV2State extends ConsumerState<PharmaciesListPageV2>
                       height: 56,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: pharmacy.isOnDuty
+                          colors: pharmacy.isOnDuty == true
                               ? [Colors.orange.shade400, Colors.orange.shade600]
                               : pharmacy.isOpen
                                   ? [AppColors.success.withValues(alpha: 0.8), AppColors.success]
@@ -684,7 +684,7 @@ class _PharmaciesListPageV2State extends ConsumerState<PharmaciesListPageV2>
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              if (pharmacy.isOnDuty)
+                              if (pharmacy.isOnDuty == true)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 8,

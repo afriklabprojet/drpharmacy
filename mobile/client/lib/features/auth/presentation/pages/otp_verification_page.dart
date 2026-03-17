@@ -50,6 +50,12 @@ class _OtpVerificationPageState extends ConsumerState<OtpVerificationPage>
   bool _autoVerified = false;
   String? _lastAutoFilledCode;
 
+  /// true = backend SMS (Infobip), false = Firebase Phone Auth
+  bool _useBackendSms = false;
+  bool _backendLoading = false;
+  String? _backendError;
+  String? _backendChannel;
+
   @override
   void initState() {
     super.initState();
@@ -211,6 +217,79 @@ class _OtpVerificationPageState extends ConsumerState<OtpVerificationPage>
   Future<void> _sendFirebaseOtp() async {
     final notifier = ref.read(firebaseOtpProvider.notifier);
     await notifier.sendOtp(widget.phoneNumber);
+    
+    // Check if Firebase failed - switch to backend SMS as fallback
+    if (!mounted) return;
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+    final state = ref.read(firebaseOtpProvider);
+    if (state.state == FirebaseOtpState.error) {
+      final err = state.errorMessage ?? '';
+      // Detect quota/config errors that mean Firebase SMS won't work
+      if (err.contains('quota') ||
+          err.contains('Quota') ||
+          err.contains('too-many-requests') ||
+          err.contains('Trop de tentatives') ||
+          err.contains('interne') ||
+          err.contains('internal') ||
+          err.contains('app-not-authorized') ||
+          err.contains('app-not-verified') ||
+          err.contains('missing-client-identifier') ||
+          err.contains('Certificat') ||
+          err.contains('non autorisée') ||
+          err.contains('non vérifiée') ||
+          err.contains('Configuration incomplète')) {
+        debugPrint('[OTP] Firebase failed, switching to backend SMS: $err');
+        await _switchToBackendSms();
+      }
+    }
+  }
+
+  /// Switch to backend SMS mode (Infobip) when Firebase fails
+  Future<void> _switchToBackendSms() async {
+    setState(() {
+      _useBackendSms = true;
+      _backendError = null;
+    });
+    // Send OTP via backend (Infobip SMS)
+    await _sendBackendOtp();
+  }
+
+  /// Send OTP via backend API (Infobip SMS/WhatsApp)
+  Future<void> _sendBackendOtp() async {
+    setState(() {
+      _backendLoading = true;
+      _backendError = null;
+    });
+    try {
+      final authNotifier = ref.read(authProvider.notifier);
+      final result = await authNotifier.resendBackendOtp(
+        identifier: widget.phoneNumber,
+      );
+      if (!mounted) return;
+      result.fold(
+        (failure) {
+          setState(() {
+            _backendError = failure.message;
+            _backendLoading = false;
+          });
+        },
+        (data) {
+          setState(() {
+            _backendChannel = data['channel'] as String?;
+            _backendLoading = false;
+          });
+          _showSnackBar(data['message'] as String? ?? 'Code envoyé par SMS');
+          _startResendCountdown();
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _backendError = 'Erreur lors de l\'envoi du code';
+        _backendLoading = false;
+      });
+    }
   }
 
   Future<void> _verifyOtp() async {
@@ -218,6 +297,14 @@ class _OtpVerificationPageState extends ConsumerState<OtpVerificationPage>
       _showSnackBar('Veuillez entrer le code complet', isError: true);
       return;
     }
+    
+    if (_useBackendSms) {
+      // Backend OTP verification (Infobip)
+      await _verifyBackendOtp();
+      return;
+    }
+    
+    // Firebase OTP verification
     final notifier = ref.read(firebaseOtpProvider.notifier);
     final result = await notifier.verifyOtp(_otpCode);
     if (!mounted) return;
@@ -225,6 +312,36 @@ class _OtpVerificationPageState extends ConsumerState<OtpVerificationPage>
       _successAnim.forward();
       await Future.delayed(const Duration(milliseconds: 400));
       if (mounted) await _linkToBackend(result.firebaseUid!);
+    }
+  }
+
+  /// Verify OTP code via backend API
+  Future<void> _verifyBackendOtp() async {
+    setState(() => _backendLoading = true);
+    try {
+      final authNotifier = ref.read(authProvider.notifier);
+      final result = await authNotifier.verifyBackendOtp(
+        identifier: widget.phoneNumber,
+        otp: _otpCode,
+      );
+      if (!mounted) return;
+      result.fold(
+        (failure) {
+          setState(() => _backendLoading = false);
+          _showSnackBar(failure.message, isError: true);
+        },
+        (authResponse) {
+          setState(() => _backendLoading = false);
+          _successAnim.forward();
+          Future.delayed(const Duration(milliseconds: 400), () {
+            if (context.mounted) context.go(AppRoutes.home);
+          });
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _backendLoading = false);
+      _showSnackBar('Erreur de vérification', isError: true);
     }
   }
 
@@ -299,13 +416,20 @@ class _OtpVerificationPageState extends ConsumerState<OtpVerificationPage>
     _autoVerified = false;
     _focusNodes[0].requestFocus();
     setState(() {});
-    final notifier = ref.read(firebaseOtpProvider.notifier);
-    await notifier.resendOtp();
-    _startResendCountdown();
-    // Restart SMS listener for the new code
-    _startSmsListener();
-    if (mounted) {
-      _showSnackBar('Nouveau code envoyé avec succès');
+    
+    if (_useBackendSms) {
+      // Resend via backend (Infobip)
+      await _sendBackendOtp();
+    } else {
+      // Resend via Firebase
+      final notifier = ref.read(firebaseOtpProvider.notifier);
+      await notifier.resendOtp();
+      _startResendCountdown();
+      // Restart SMS listener for the new code
+      _startSmsListener();
+      if (mounted) {
+        _showSnackBar('Nouveau code envoyé avec succès');
+      }
     }
   }
 
@@ -325,15 +449,18 @@ class _OtpVerificationPageState extends ConsumerState<OtpVerificationPage>
   Widget build(BuildContext context) {
     final otpState = ref.watch(firebaseOtpProvider);
     final countdown = ref.watch(countdownProvider(_otpCountdownId));
-    final isLoading = otpState.isLoading;
-    final errorMessage = otpState.errorMessage;
+    // In backend mode, use local state; otherwise use Firebase state
+    final isLoading = _useBackendSms ? _backendLoading : otpState.isLoading;
+    final errorMessage = _useBackendSms ? _backendError : otpState.errorMessage;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenH = MediaQuery.of(context).size.height;
 
-    // Handle Firebase auto-verification
-    ref.listen<FirebaseOtpStateData>(firebaseOtpProvider, (previous, next) {
-      _handleAutoVerification(next);
-    });
+    // Handle Firebase auto-verification (only in Firebase mode)
+    if (!_useBackendSms) {
+      ref.listen<FirebaseOtpStateData>(firebaseOtpProvider, (previous, next) {
+        _handleAutoVerification(next);
+      });
+    }
 
     return PopScope(
       canPop: false,
@@ -546,6 +673,32 @@ class _OtpVerificationPageState extends ConsumerState<OtpVerificationPage>
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 10),
+        // Show different message depending on OTP mode
+        if (_useBackendSms) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: Colors.orange.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.sms_rounded, size: 14, color: Colors.orange.shade700),
+                const SizedBox(width: 6),
+                Text(
+                  'Code envoyé par ${_backendChannel == 'whatsapp' ? 'WhatsApp' : 'SMS'}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.orange.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         Text(
           'Entrez le code à 6 chiffres envoyé au',
           style: TextStyle(

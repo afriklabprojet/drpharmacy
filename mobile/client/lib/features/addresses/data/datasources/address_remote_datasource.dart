@@ -3,6 +3,19 @@ import '../../../../core/network/api_client.dart';
 import '../../domain/repositories/address_repository.dart';
 import '../models/address_model.dart';
 
+/// Données de formulaire d'adresse (labels, valeurs par défaut)
+class AddressFormData {
+  final List<String> labels;
+  final String? defaultPhone;
+  final String? userName;
+
+  const AddressFormData({
+    required this.labels,
+    this.defaultPhone,
+    this.userName,
+  });
+}
+
 /// Data source pour les adresses via l'API
 class AddressRemoteDataSource {
   final ApiClient _apiClient;

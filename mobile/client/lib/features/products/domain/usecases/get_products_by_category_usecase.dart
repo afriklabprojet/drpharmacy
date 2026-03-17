@@ -1,0 +1,12 @@
+import 'package:dartz/dartz.dart';
+import '../../../../core/errors/failures.dart';
+import '../entities/product_entity.dart';
+
+class GetProductsByCategoryUseCase {
+  final dynamic repository;
+  GetProductsByCategoryUseCase(this.repository);
+
+  Future<Either<Failure, List<ProductEntity>>> call({String? category, int page = 1}) async {
+    return await repository.getProductsByCategory(category: category, page: page);
+  }
+}

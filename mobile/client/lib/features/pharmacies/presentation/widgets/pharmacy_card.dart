@@ -86,7 +86,7 @@ class PharmacyCard extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              if (pharmacy.isOnDuty)
+                              if (pharmacy.isOnDuty == true)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 8,

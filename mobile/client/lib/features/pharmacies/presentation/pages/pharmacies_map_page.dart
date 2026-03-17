@@ -76,7 +76,7 @@ class _PharmaciesMapPageState extends State<PharmaciesMapPage> {
             position: LatLng(pharmacy.latitude!, pharmacy.longitude!),
             infoWindow: InfoWindow(
               title: pharmacy.name,
-              snippet: pharmacy.isOnDuty 
+              snippet: pharmacy.isOnDuty == true
                   ? 'Garde ${pharmacy.dutyType != null ? "- ${pharmacy.dutyType}" : ""}' 
                   : (pharmacy.isOpen ? 'Ouverte' : 'Fermée'),
               onTap: () {
@@ -84,7 +84,7 @@ class _PharmaciesMapPageState extends State<PharmaciesMapPage> {
               },
             ),
             icon: BitmapDescriptor.defaultMarkerWithHue(
-              pharmacy.isOnDuty 
+              pharmacy.isOnDuty == true
                   ? BitmapDescriptor.hueOrange
                   : (pharmacy.isOpen
                       ? BitmapDescriptor.hueGreen
@@ -249,7 +249,7 @@ class _PharmaciesMapPageState extends State<PharmaciesMapPage> {
                 margin: const EdgeInsets.only(bottom: 12),
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: pharmacy.isOnDuty
+                    backgroundColor: pharmacy.isOnDuty == true
                         ? Colors.orange
                         : (pharmacy.isOpen ? Colors.green : Colors.red),
                     child: const Icon(Icons.local_pharmacy, color: Colors.white),
@@ -266,7 +266,7 @@ class _PharmaciesMapPageState extends State<PharmaciesMapPage> {
                   trailing: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      if (pharmacy.isOnDuty)
+                      if (pharmacy.isOnDuty == true)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(

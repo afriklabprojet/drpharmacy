@@ -238,6 +238,11 @@ class _OrderDetailsPageState extends ConsumerState<OrderDetailsPage> {
         textColor = Colors.blue;
         icon = Icons.check_circle;
         break;
+      case OrderStatus.preparing:
+        backgroundColor = Colors.purple.withValues(alpha: 0.1);
+        textColor = Colors.purple;
+        icon = Icons.restaurant_menu;
+        break;
       case OrderStatus.ready:
         backgroundColor = Colors.blue.withValues(alpha: 0.1);
         textColor = Colors.blue;

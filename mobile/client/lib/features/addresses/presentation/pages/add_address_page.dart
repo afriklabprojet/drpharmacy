@@ -518,7 +518,7 @@ class _AddAddressPageState extends ConsumerState<AddAddressPage> {
     );
 
     if (mounted) {
-      if (success) {
+      if (success != null) {
         ErrorHandler.showSuccessSnackBar(context, 'Adresse ajoutée avec succès');
         Navigator.pop(context);
       } else {

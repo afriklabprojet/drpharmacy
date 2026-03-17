@@ -227,3 +227,6 @@ class PricingCalculationModel {
     );
   }
 }
+
+/// Alias pour compatibilité
+typedef PricingModel = PricingConfigModel;

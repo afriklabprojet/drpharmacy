@@ -81,10 +81,9 @@ class ProfileNotifier extends StateNotifier<ProfileState> {
       },
       (avatarUrl) {
         // Update profile with new avatar URL
-        final updatedProfile = state.profile!.copyWith(avatar: avatarUrl);
         state = state.copyWith(
           status: ProfileStatus.loaded,
-          profile: updatedProfile,
+          avatar: avatarUrl,
         );
         return true;
       },
@@ -108,10 +107,9 @@ class ProfileNotifier extends StateNotifier<ProfileState> {
       },
       (_) {
         // Update profile to remove avatar
-        final updatedProfile = state.profile!.copyWith(clearAvatar: true);
         state = state.copyWith(
           status: ProfileStatus.loaded,
-          profile: updatedProfile,
+          clearAvatar: true,
         );
         return true;
       },
