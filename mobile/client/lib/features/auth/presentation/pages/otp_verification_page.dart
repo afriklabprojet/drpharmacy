@@ -215,33 +215,52 @@ class _OtpVerificationPageState extends ConsumerState<OtpVerificationPage>
   }
 
   Future<void> _sendFirebaseOtp() async {
+    final completer = Completer<void>();
+
+    // Listen for Firebase state resolution (codeSent, error, verified, timeout)
+    final sub = ref.listenManual<FirebaseOtpStateData>(
+      firebaseOtpProvider,
+      (previous, next) {
+        if (!completer.isCompleted &&
+            (next.state == FirebaseOtpState.codeSent ||
+             next.state == FirebaseOtpState.error ||
+             next.state == FirebaseOtpState.verified ||
+             next.state == FirebaseOtpState.timeout)) {
+          completer.complete();
+        }
+      },
+    );
+
     final notifier = ref.read(firebaseOtpProvider.notifier);
     await notifier.sendOtp(widget.phoneNumber);
-    
-    // Check if Firebase failed - switch to backend SMS as fallback
-    if (!mounted) return;
-    await Future.delayed(const Duration(milliseconds: 500));
+
+    // Wait for Firebase to actually respond (max 15 seconds)
+    try {
+      await completer.future.timeout(const Duration(seconds: 15));
+    } catch (_) {
+      debugPrint('[OTP] Firebase did not respond within 15s, falling back to backend SMS');
+    }
+
+    sub.close();
+
     if (!mounted) return;
     final state = ref.read(firebaseOtpProvider);
-    if (state.state == FirebaseOtpState.error) {
-      final err = state.errorMessage ?? '';
-      // Detect quota/config errors that mean Firebase SMS won't work
-      if (err.contains('quota') ||
-          err.contains('Quota') ||
-          err.contains('too-many-requests') ||
-          err.contains('Trop de tentatives') ||
-          err.contains('interne') ||
-          err.contains('internal') ||
-          err.contains('app-not-authorized') ||
-          err.contains('app-not-verified') ||
-          err.contains('missing-client-identifier') ||
-          err.contains('Certificat') ||
-          err.contains('non autorisée') ||
-          err.contains('non vérifiée') ||
-          err.contains('Configuration incomplète')) {
-        debugPrint('[OTP] Firebase failed, switching to backend SMS: $err');
-        await _switchToBackendSms();
-      }
+
+    // If Firebase succeeded (codeSent or verified), no fallback needed
+    if (state.state == FirebaseOtpState.codeSent ||
+        state.state == FirebaseOtpState.verified) {
+      return;
+    }
+
+    // Firebase failed or timed out — check if we should fallback
+    final err = state.errorMessage ?? '';
+    
+    // Only skip fallback for user-caused errors (invalid phone number)
+    final isUserError = err.contains('invalide') && !err.contains('interne');
+    
+    if (!isUserError) {
+      debugPrint('[OTP] Firebase failed ($err), switching to backend SMS');
+      await _switchToBackendSms();
     }
   }
 
